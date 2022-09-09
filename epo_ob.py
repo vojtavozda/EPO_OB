@@ -1,4 +1,6 @@
 
+from genericpath import isfile
+import os
 import sys
 import numpy as np
 import pandas as pd
@@ -8,18 +10,20 @@ import qtawesome as qta         # run `qta-browser`
 
 from PyQt5 import QtWidgets
 from PyQt5 import QtGui
-from PyQt5.QtGui import (QColor, QBrush, QFont, QTextCursor)
-from PyQt5.QtCore import (QPoint, Qt)
-from PyQt5.QtWidgets import (QAction, QStyle, QComboBox, QApplication, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QStyleFactory, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget)
+from PyQt5.QtGui import (QColor, QBrush, QFont, QTextCursor, QRegExpValidator)
+from PyQt5.QtCore import (QPoint, Qt, QRegExp)
+from PyQt5.QtWidgets import (QAction, QFileDialog, QStyle, QComboBox, QApplication, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QStyleFactory, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget)
 
-csvFile = "/home/vovo/Programming/python/EPO/data.csv"
 
 def str2sec(time_str:str):
     
     if time_str == '': return None
 
-    h,m,s = time_str.split(':')
-    return int(h)*3600 + int(m)*60 + int(s)
+    try:
+        h,m,s = time_str.split(':')
+        return int(h)*3600 + int(m)*60 + int(s)
+    except:
+        return None
 
 def sec2str(seconds:int):
     m, s = divmod(seconds,60)
@@ -32,6 +36,8 @@ def diff_times(start_str:str,finish_str:str):
 
     sec1 = str2sec(start_str)
     sec2 = str2sec(finish_str)
+    if sec1 is None or sec2 is None: return None
+    
     diff = sec2-sec1
     m, s = divmod(diff,60)
     h, m = divmod(m,60)
@@ -77,6 +83,7 @@ class EPOGUI(QMainWindow):
         #             0    1      2        3       4        5      6      7      8
         self.cols = ['ID','Name','Gender','Start','Finish','Time','Loss','Score','Note']
 
+        self.csvFile = "/home/vovo/Programming/python/EPO_OB/data.csv"
         self.maxScore = 27
         self.leaderTime = None
 
@@ -84,6 +91,7 @@ class EPOGUI(QMainWindow):
         self.lblSF = QLabel("Start/Finish")
         self.qleID = QLineEdit()
         self.qleID.setMaximumWidth(50)
+        self.qleID.setValidator(QRegExpValidator(QRegExp("\\d+")))
         self.qleID.returnPressed.connect(self.start_stop)
 
         self.btnOK = QPushButton(' OK',self)
@@ -188,7 +196,6 @@ class EPOGUI(QMainWindow):
         self.dispMsg("Program started!")
 
         self.loadCSV()
-        self.saveCSV()
 
 
     
@@ -212,14 +219,27 @@ class EPOGUI(QMainWindow):
 
     def createMenus(self):
 
+        self.newCSVAct = QAction(
+            "&New CSV",
+            icon=standardIcon('SP_FileIcon'),
+            triggered = self.newCSV
+        )
+
+        self.openCSVAct = QAction(
+            "&Open CSV",
+            icon = standardIcon('SP_DialogOpenButton'),
+            triggered = self.openCSV
+        )
+
         self.saveCSVAct = QAction(
             "&Save CSV",
             icon=standardIcon('SP_DriveFDIcon'),
             triggered = self.saveCSV
-            
         )
         
         fileMenu = QMenu("&File",self)
+        fileMenu.addAction(self.newCSVAct)
+        fileMenu.addAction(self.openCSVAct)
         fileMenu.addAction(self.saveCSVAct)
 
         self.showOutputAct = QAction(
@@ -263,7 +283,13 @@ class EPOGUI(QMainWindow):
 
     def start_stop(self):
 
-        ID = int(self.qleID.text())
+        ID = self.qleID.text()
+        try:
+            ID = int(self.qleID.text())
+        except:
+            self.dispMsg("ID must be interger!",fc=Qt.red)
+            return
+
         self.qleID.setText('')
 
         row = None
@@ -289,7 +315,17 @@ class EPOGUI(QMainWindow):
             finish = self.table.item(row,4).text()
             
             if finish != '':
-                self.dispMsg(f'{name} ({ID}) already finished!',fc=Qt.red)
+                time = diff_times(start,now)
+                loss = self.getLoss(time)
+                rank = self.getRank(ID)
+
+                self.dispMsg(f'{name}',fc=Qt.darkYellow,fw=QFont.Bold,end=' ')
+                self.dispMsg(f'({ID}) already finished at {now}, time =',fc=Qt.darkYellow,end=' ')
+                self.dispMsg(f'{time}',fc=Qt.darkYellow,fw=QFont.Bold,end='')
+                self.dispMsg(f', loss =',fc=Qt.darkYellow,end=' ')
+                self.dispMsg(f'{loss}',fc=Qt.darkYellow,fw=QFont.Bold,end='')
+                self.dispMsg(f', rank: ',fc=Qt.darkYellow,end='')
+                self.dispMsg(f'{rank}',fc=Qt.darkYellow,fw=QFont.Bold)
                 return
 
             # Store time
@@ -488,14 +524,43 @@ class EPOGUI(QMainWindow):
         if self.sortBy == 'Name' or self.sortBy == 'ID':
             self.sortTable()
 
+    def newCSV(self):
+        """ Create new CSV file and redefine `self.csvFile` """
+        filename,_ = QFileDialog.getSaveFileName(self, 'New CSV file','','CSV file (*.csv)')
+        print(os.path.splitext(filename)[1])
+        if filename != '' and os.path.splitext(filename)[1]=='.csv':
+            self.csvFile = filename
+            self.dispMsg(f"New CSV file '{filename}' defined!",fc=Qt.darkGreen)
+            self.table.setRowCount(0)
+        else:
+            self.dispMsg(f"File '{filename}' not created!",fc=Qt.red)
+            self.dispMsg(f"Filename should not be empty and must end with '.csv' extension!",fc=Qt.red)
+
+    def openCSV(self):
+        """ Define new `self.csvFile` """
+        filename,_ = QFileDialog.getOpenFileName(self, 'Select CSV file','',"CSV file (*.csv)")
+        if os.path.isfile(filename):
+            self.csvFile = filename
+            self.dispMsg(f"New CSV file '{filename}' selected!",fc=Qt.darkGreen)
+            self.loadCSV()
+
     def loadCSV(self):
         """ Load CSV file into table """
+
+        if not os.path.isfile(self.csvFile):
+            self.dispMsg(f"File '{self.csvFile}' not found!",fc=Qt.red)
+            return
 
         # Clear table
         self.table.setRowCount(0)
 
         # Load file
-        df = pd.read_csv(csvFile)
+        df = pd.read_csv(self.csvFile)
+
+        # Check if file contains all columns
+        if not {'ID','Name','Gender','Start','Finish','Time','Loss','Score','Note'}.issubset(df.columns):
+            self.dispMsg(f"CSV file must contain following columns: ID,Name,Gender,Start,Finish,Time,Loss,Score,Note",fc=Qt.red)
+            return
 
         # Sort dataframe
         if self.sortBy == 'ID':
@@ -541,7 +606,7 @@ class EPOGUI(QMainWindow):
 
         data = list(zip(ID,name,gender,start,finish,time,loss,score,note))
         df = pd.DataFrame(data,columns=['ID','Name','Gender','Start','Finish','Time','Loss','Score','Note'])
-        df.to_csv(csvFile,index=False)
+        df.to_csv(self.csvFile,index=False)
         
 
     def tableCellChanged(self,row,col):
