@@ -80,8 +80,8 @@ class EPOGUI(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        #             0    1      2        3       4        5      6      7      8
-        self.cols = ['ID','Name','Gender','Start','Finish','Time','Loss','Score','Note']
+        #             0    1      2        3       4        5      6      7      8      9      10
+        self.cols = ['ID','Name','Gender','Start','Finish','Time','Loss','Score','Note','Reg.','Fee']
 
         self.csvFile = "/home/vovo/Programming/python/EPO_OB/data.csv"
         self.maxScore = 27
@@ -91,6 +91,7 @@ class EPOGUI(QMainWindow):
         self.lblSF = QLabel("Start/Finish")
         self.qleID = QLineEdit()
         self.qleID.setMaximumWidth(50)
+        self.qleID.setToolTip(f"Enter runner ID and press enter.\nActivate field by Esc.")
         self.qleID.setValidator(QRegExpValidator(QRegExp("\\d+")))
         self.qleID.returnPressed.connect(self.start_stop)
 
@@ -101,12 +102,20 @@ class EPOGUI(QMainWindow):
         self.btnOK.clicked.connect(self.btnClicked)
 
         # New runner -----------------------------------------------------------
+        self.lblNewRunner = QLabel("New runner")
         self.qleNewName = QLineEdit()
+        self.qleNewName.setToolTip("Runner full name")
         self.qleNewName.returnPressed.connect(self.addRunner)
 
         self.cmbNewGender = QComboBox()
         self.cmbNewGender.addItems(['M','W'])
+        self.cmbNewGender.setToolTip("Gender")
         self.cmbNewGender.setCurrentIndex(0)
+
+        self.qleNewNote = QLineEdit()
+        self.qleNewNote.setMaximumWidth(150)
+        self.qleNewNote.setToolTip("Arbitrary note")
+        self.qleNewNote.returnPressed.connect(self.addRunner)
 
         self.btnAdd = QPushButton(' Add',self)
         self.btnAdd.setObjectName('btn_add')
@@ -127,18 +136,22 @@ class EPOGUI(QMainWindow):
 
         # Table ----------------------------------------------------------------
         self.table = QTableWidget()
-        self.table.setColumnCount(9)
+        self.table.setColumnCount(11)
         self.table.setHorizontalHeaderLabels(self.cols)
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0,QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1,QtWidgets.QHeaderView.Stretch)
-        header.setSectionResizeMode(2,QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(3,QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4,QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(5,QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(6,QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(7,QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(8,QtWidgets.QHeaderView.Interactive)
+        header.setSectionResizeMode( 0,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 1,QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode( 2,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 3,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 4,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 5,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 6,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 7,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 8,QtWidgets.QHeaderView.Interactive)
+        header.setSectionResizeMode( 9,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(10,QtWidgets.QHeaderView.ResizeToContents)
+        self.table.setColumnHidden(9,True)
+        self.table.setColumnHidden(10,True)
         
         self.table.cellChanged.connect(self.tableCellChanged)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -159,8 +172,10 @@ class EPOGUI(QMainWindow):
         hboxID.addStretch()
 
         hboxNewRunner = QHBoxLayout()
+        hboxNewRunner.addWidget(self.lblNewRunner)
         hboxNewRunner.addWidget(self.qleNewName)
         hboxNewRunner.addWidget(self.cmbNewGender)
+        hboxNewRunner.addWidget(self.qleNewNote)
         hboxNewRunner.addWidget(self.btnAdd)
 
         hboxTabMenu = QHBoxLayout()
@@ -470,23 +485,27 @@ class EPOGUI(QMainWindow):
         self.loadCSV()
 
 
-    def addRow(self,r,ID,name,gender,start,finish,time,loss,score,note):
+    def addRow(self,r,ID,name,gender,start,finish,time,loss,score,note,reg,fee):
 
         if time != '' and score == '': score = 0
         if score != '':
             score = str(int(float(score)))
 
+        reg = reg if reg != '' else False
+
         self.table.insertRow(r)
         self.table.setRowHeight(r,15)
-        self.table.setItem(r,0,QTableWidgetItem(str(ID)))
-        self.table.setItem(r,1,QTableWidgetItem(str(name)))
-        self.table.setItem(r,2,QTableWidgetItem(str(gender)))
-        self.table.setItem(r,3,QTableWidgetItem(str(start)))
-        self.table.setItem(r,4,QTableWidgetItem(str(finish)))
-        self.table.setItem(r,5,QTableWidgetItem(str(time)))
-        self.table.setItem(r,6,QTableWidgetItem(str(loss)))
-        self.table.setItem(r,7,QTableWidgetItem(str(score)))
-        self.table.setItem(r,8,QTableWidgetItem(str(note)))
+        self.table.setItem(r, 0,QTableWidgetItem(str(ID)))
+        self.table.setItem(r, 1,QTableWidgetItem(str(name)))
+        self.table.setItem(r, 2,QTableWidgetItem(str(gender)))
+        self.table.setItem(r, 3,QTableWidgetItem(str(start)))
+        self.table.setItem(r, 4,QTableWidgetItem(str(finish)))
+        self.table.setItem(r, 5,QTableWidgetItem(str(time)))
+        self.table.setItem(r, 6,QTableWidgetItem(str(loss)))
+        self.table.setItem(r, 7,QTableWidgetItem(str(score)))
+        self.table.setItem(r, 8,QTableWidgetItem(str(note)))
+        self.table.setItem(r, 9,QTableWidgetItem(str(reg)))
+        self.table.setItem(r,10,QTableWidgetItem(str(fee)))
 
         clr = None
         if gender == 'M':
@@ -510,11 +529,13 @@ class EPOGUI(QMainWindow):
             return
         # Get gender from drop box
         newGender = 'M' if self.cmbNewGender.currentIndex()==0 else 'W'
+        # Get note
+        newNote = self.qleNewNote.text()
         # ID is the lowest ID which is not in the table
         newID = self.getEmptyID()
         # Apend row to the end of the table
         r = self.table.rowCount()
-        self.addRow(r,newID,newName,newGender,'','','','','','')
+        self.addRow(r,newID,newName,newGender,'','','','','',newNote,'','')
         # Clear text box so it is ready for new entry
         self.qleNewName.setText('')
         self.dispMsg(f"New runner: {newID}, {newName}, {newGender}",fc=Qt.darkGreen)
@@ -558,8 +579,8 @@ class EPOGUI(QMainWindow):
         df = pd.read_csv(self.csvFile)
 
         # Check if file contains all columns
-        if not {'ID','Name','Gender','Start','Finish','Time','Loss','Score','Note'}.issubset(df.columns):
-            self.dispMsg(f"CSV file must contain following columns: ID,Name,Gender,Start,Finish,Time,Loss,Score,Note",fc=Qt.red)
+        if not {'ID','Name','Gender','Start','Finish','Time','Loss','Score','Note','Reg.','Fee'}.issubset(df.columns):
+            self.dispMsg(f"CSV file must contain following columns: ID,Name,Gender,Start,Finish,Time,Loss,Score,Note,Reg.,Fee",fc=Qt.red)
             return
 
         # Sort dataframe
@@ -576,8 +597,10 @@ class EPOGUI(QMainWindow):
             finish = row['Finish'] if not pd.isnull(row['Finish']) else ''
             score = row['Score'] if not pd.isnull(row['Score']) else ''
             note = row['Note'] if not pd.isnull(row['Note']) else ''
+            reg = row['Reg.'] if not pd.isnull(row['Reg.']) else ''
+            fee = row['Fee'] if not pd.isnull(row['Fee']) else ''
 
-            self.addRow(r,row['ID'],row['Name'],row['Gender'],start,finish,'','',score,note)
+            self.addRow(r,row['ID'],row['Name'],row['Gender'],start,finish,'','',score,note,reg,fee)
 
         self.updateTimeAndLoss()
 
@@ -593,6 +616,8 @@ class EPOGUI(QMainWindow):
         loss = list()
         score = list()
         note = list()
+        reg = list()
+        fee = list()
         for r in range(self.table.rowCount()):
             ID.append(self.table.item(r,0).text())
             name.append(self.table.item(r,1).text())
@@ -603,9 +628,12 @@ class EPOGUI(QMainWindow):
             loss.append(self.table.item(r,6).text())
             score.append(self.table.item(r,7).text())
             note.append(self.table.item(r,8).text())
+            reg.append(self.table.item(r,9).text())
+            fee.append(self.table.item(r,10).text())
 
-        data = list(zip(ID,name,gender,start,finish,time,loss,score,note))
-        df = pd.DataFrame(data,columns=['ID','Name','Gender','Start','Finish','Time','Loss','Score','Note'])
+
+        data = list(zip(ID,name,gender,start,finish,time,loss,score,note,reg,fee))
+        df = pd.DataFrame(data,columns=['ID','Name','Gender','Start','Finish','Time','Loss','Score','Note','Reg.','Fee'])
         df.to_csv(self.csvFile,index=False)
         
 
