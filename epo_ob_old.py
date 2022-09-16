@@ -1,13 +1,10 @@
 
-from cmath import isnan
 from genericpath import isfile
 import os
-import re
 import sys
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from timeit import default_timer as timer 
 
 import qtawesome as qta         # run `qta-browser`
 
@@ -20,39 +17,18 @@ from PyQt5.QtWidgets import (QAction, QFileDialog, QStyle, QComboBox, QApplicati
 
 def str2sec(time_str:str):
     
-    """ Convert string '+-HH:MM:SS' to seconds """
-
-    if time_str == '': return np.nan
+    if time_str == '': return None
 
     try:
-        time_str = time_str.replace('+','')
-        sign = 1 if '-' not in time_str else -1
-        time_str = time_str.replace('-','')
         h,m,s = time_str.split(':')
-        # print(f'str2sec({time_str})',sign,h,m,s)
-        return sign*(int(h)*3600 + int(m)*60 + int(s))
+        return int(h)*3600 + int(m)*60 + int(s)
     except:
-        return np.nan
+        return None
 
-def sec2str(seconds:int,add_sign=False):
-
-    """ Convert seconds to string 'HH:MM:SS' """
-
-    if np.isnan(seconds): return np.nan
-    
-    if seconds >= 0:
-        if add_sign:
-            sign = '+'
-        else:
-            sign = ''
-    else:
-        sign = '-'
-    seconds = abs(seconds)
-
+def sec2str(seconds:int):
     m, s = divmod(seconds,60)
     h, m = divmod(m,60)
-    return sign + '%02d:%02d:%02d'%(h,m,s)
-
+    return '%02d:%02d:%02d'%(h,m,s)
 
 def diff_times(start_str:str,finish_str:str):
     
@@ -103,22 +79,13 @@ class EPOGUI(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        
-        # Dataframe holding all data
-        self.df = None
 
-        # Define columns
-        self.cols = ['ID','Name','Gender','Start','Finish','Time','Loss','Score','Note','Registered','Fee']
+        #             0    1      2        3       4        5      6      7      8      9      10
+        self.cols = ['ID','Name','Gender','Start','Finish','Time','Loss','Score','Note','Reg.','Fee']
 
         self.csvFile = "/home/vovo/Programming/python/EPO_OB/data.csv"
         self.maxScore = 27
         self.leaderTime = None
-
-        # Callback on changing content of the table is called although if it is
-        # changed programatically. Therefore `drawingTable` is set to `True`
-        # while generating table and to `False` after that. Callback on content
-        # change is called only when `drawingTable == False`.
-        self.drawingTable = False
 
         # Start/Finish ---------------------------------------------------------
         self.lblSF = QLabel("Start/Finish")
@@ -161,11 +128,6 @@ class EPOGUI(QMainWindow):
         self.cmbSort.addItems(['Rank','ID','Name'])
         self.cmbSort.activated[str].connect(self.cmbSortChanged)
         self.sortBy = 'Rank'
-
-        self.lblFilter = QLabel('Filter:')
-        self.qleFilter = QLineEdit()
-        self.qleFilter.setToolTip("Write part of name")
-        self.qleFilter.textChanged.connect(self.setFilter)
         
         self.btnUpdate = QPushButton(' Update',self)
         self.btnUpdate.setObjectName('btn_update')
@@ -174,24 +136,23 @@ class EPOGUI(QMainWindow):
 
         # Table ----------------------------------------------------------------
         self.table = QTableWidget()
-        self.table.setColumnCount(len(self.cols))
-        header = self.table.horizontalHeader()
+        self.table.setColumnCount(11)
         self.table.setHorizontalHeaderLabels(self.cols)
-
-        header.setSectionResizeMode(self.cols.index('ID'),      QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(self.cols.index('Name'),    QtWidgets.QHeaderView.Stretch)
-        header.setSectionResizeMode(self.cols.index('Gender'),  QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(self.cols.index('Start'),   QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(self.cols.index('Finish'),  QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(self.cols.index('Time'),    QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(self.cols.index('Loss'),    QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(self.cols.index('Score'),   QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(self.cols.index('Note'),    QtWidgets.QHeaderView.Interactive)
-        header.setSectionResizeMode(self.cols.index('Registered'),QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(self.cols.index('Fee'),     QtWidgets.QHeaderView.ResizeToContents)
-        self.table.setColumnHidden(self.cols.index('Registered'),True)
-        # self.table.setColumnHidden(self.cols.index('Fee'),True)
-
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode( 0,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 1,QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode( 2,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 3,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 4,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 5,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 6,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 7,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode( 8,QtWidgets.QHeaderView.Interactive)
+        header.setSectionResizeMode( 9,QtWidgets.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(10,QtWidgets.QHeaderView.ResizeToContents)
+        self.table.setColumnHidden(9,True)
+        self.table.setColumnHidden(10,True)
+        
         self.table.cellChanged.connect(self.tableCellChanged)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.tableContextMenu)
@@ -220,8 +181,6 @@ class EPOGUI(QMainWindow):
         hboxTabMenu = QHBoxLayout()
         hboxTabMenu.addWidget(self.lblSort)
         hboxTabMenu.addWidget(self.cmbSort)
-        hboxTabMenu.addWidget(self.lblFilter)
-        hboxTabMenu.addWidget(self.qleFilter)
         hboxTabMenu.addStretch()
         hboxTabMenu.addWidget(self.btnUpdate)
 
@@ -304,7 +263,6 @@ class EPOGUI(QMainWindow):
             triggered=self.toggleOutputVisibility,
             checkable=True
         )
-        self.showOutputAct.setChecked(True)
 
         viewMenu = QMenu("&View",self)
         viewMenu.addAction(self.showOutputAct)
@@ -349,82 +307,217 @@ class EPOGUI(QMainWindow):
 
         self.qleID.setText('')
 
-        if ID not in self.df.index:
+        row = None
+        for r in range(self.table.rowCount()):
+            rID = int(self.table.item(r,0).text())
+            if rID == ID:
+                row = r
+                break
+        if row is None:
             self.dispMsg(f'ID {ID} not found!',fc=Qt.red)
             return
 
         now = datetime.now()
-        now = now.hour*3600+now.minute*60+now.second
-
-        start = self.df.loc[ID,'Start']
-        name = self.df.loc[ID,'Name']
-        if np.isnan(start):
-            # Runner not started yet -> start!
-            self.df.loc[ID,'Start'] = now
-            self.dispMsg(f'{name} ({ID}) started at {sec2str(now)}',fc=Qt.darkGreen)
+        now = sec2str(now.hour*3600+now.minute*60+now.second)
+        start = self.table.item(row,3).text()
+        name = self.table.item(row,1).text()
+        if start=='':
+            self.table.item(row,3).setText(now)
+            self.dispMsg(f'{name} ({ID}) started at {now}',fc=Qt.darkGreen)
+            self.saveCSV()
         else:
-
-            finish = self.df.loc[ID,'Finish']
-            if not np.isnan(finish):
-                # Runner is already in finish -> print results
+            
+            finish = self.table.item(row,4).text()
+            
+            if finish != '':
+                time = diff_times(start,now)
+                loss = self.getLoss(time)
                 rank = self.getRank(ID)
 
                 self.dispMsg(f'{name}',fc=Qt.darkYellow,fw=QFont.Bold,end=' ')
-                self.dispMsg(f"({ID}) already finished at {sec2str(self.df.loc[ID,'Finish'])}, time =",fc=Qt.darkYellow,end=' ')
-                self.dispMsg(f"{sec2str(self.df.loc[ID,'Time'])}",fc=Qt.darkYellow,fw=QFont.Bold,end='')
+                self.dispMsg(f'({ID}) already finished at {now}, time =',fc=Qt.darkYellow,end=' ')
+                self.dispMsg(f'{time}',fc=Qt.darkYellow,fw=QFont.Bold,end='')
                 self.dispMsg(f', loss =',fc=Qt.darkYellow,end=' ')
-                self.dispMsg(f"{sec2str(self.df.loc[ID,'Loss'])}",fc=Qt.darkYellow,fw=QFont.Bold,end='')
+                self.dispMsg(f'{loss}',fc=Qt.darkYellow,fw=QFont.Bold,end='')
                 self.dispMsg(f', rank: ',fc=Qt.darkYellow,end='')
                 self.dispMsg(f'{rank}',fc=Qt.darkYellow,fw=QFont.Bold)
                 return
 
-            # Runner started but not in finish -> finish!
-            self.df.loc[ID,'Finish'] = now
-            self.df.loc[ID,'Score'] = self.maxScore
-            self.updateTimeAndLoss()
+            # Store time
+            self.table.item(row,4).setText(now)
+            time = diff_times(start,now)
+            loss = self.getLoss(time)
+            self.table.item(row,5).setText(time)
+            self.table.item(row,6).setText(loss)
+            self.table.item(row,7).setText(str(self.maxScore))
+
+            if self.leaderTime is None:
+                # First runner in finish -> new leader time
+                self.updateTimeAndLoss()
+            elif str2sec(time) < str2sec(self.leaderTime):
+                # New leading runner
+                self.updateTimeAndLoss()
+
+            if self.sortBy == 'Rank':
+                self.sortTable()
+            else:
+                self.saveCSV()
 
             rank = self.getRank(ID)
             self.dispMsg(f'{name}',fc=Qt.blue,fw=QFont.Bold,end=' ')
-            self.dispMsg(f'({ID}) finished at {sec2str(now)}, time =',fc=Qt.blue,end=' ')
-            self.dispMsg(f"{sec2str(self.df.loc[ID,'Time'])}",fc=Qt.blue,fw=QFont.Bold,end='')
+            self.dispMsg(f'({ID}) finished at {now}, time =',fc=Qt.blue,end=' ')
+            self.dispMsg(f'{time}',fc=Qt.blue,fw=QFont.Bold,end='')
             self.dispMsg(f', loss =',fc=Qt.blue,end=' ')
-            self.dispMsg(f"{sec2str(self.df.loc[ID,'Loss'])}",fc=Qt.blue,fw=QFont.Bold,end='')
+            self.dispMsg(f'{loss}',fc=Qt.blue,fw=QFont.Bold,end='')
             self.dispMsg(f', rank: ',fc=Qt.blue,end='')
             self.dispMsg(f'{rank}',fc=Qt.blue,fw=QFont.Bold)
 
-        self.updateTable()
-        self.saveCSV()
+
 
     def getEmptyID(self):
-        """ Return smallest ID which is missing in the dataframe """
+        """ Return smallest ID which is missing in the table """
+        
+        IDs = list()
+        for r in range(self.table.rowCount()):
+            IDs.append(int(self.table.item(r,0).text()))
 
-        return next(i for i, e in enumerate(sorted(self.df.index.to_list())+[None],1) if i!= e)
+        # Return smallest missing number
+        return next(i for i, e in enumerate(sorted(IDs)+[None],1) if i != e)
 
+    def getLoss(self,time:str):
+        """ Return loss (str) to the leader """
+
+        leaderTime = self.leaderTime
+        if leaderTime is None: leaderTime = time
+        if str2sec(leaderTime) <= str2sec(time):
+            return '+'+diff_times(leaderTime,time)
+        else:
+            return '-'+diff_times(time,leaderTime)
+        # r1 = times.index(min(times)) 
 
     def getRank(self,ID):
-        """ Return integer of rank of runner with given ID """
+        """ int """
 
-        df = self.df.sort_values(by=['Score','Time'],ascending=[False,True])
-        return df.index.get_loc(ID)+1
+        IDs = list()
+        scores = list()
+        times = list()
+
+        for r in range(self.table.rowCount()):
+            # Get runner's time
+            sec = str2sec(self.table.item(r,5).text())
+            if sec is not None:
+                # Store time only if present
+                times.append(sec)
+                IDs.append(int(self.table.item(r,0).text()))
+                score = self.table.item(r,7).text()
+                if score != '':
+                    scores.append(int(float(score)))
+                else:
+                    scores.append(0)
+
+        if len(times) == 0:
+            self.leaderTime = None
+        else:
+            data = list(zip(IDs,scores,times))
+            df = pd.DataFrame(data,columns=['ID','Score','Time'])
+            df = df.sort_values(by=['Score','Time'],ascending=[False,True])
+
+            return df.index[df['ID']==ID].tolist()[0]+1
 
     def updateLeaderTime(self):
-        """ Update `self.leaderTime`: seconds or NaN if nobody in finish """
+        """ Updates `self.leaderTime` (string) or `None` if nobody in finish """
 
-        # Get dataframe sorted by Score and Time
-        df = self.df.sort_values(by=['Score','Time'],ascending=[False,True])
-        # Leaders time is the first one
-        self.leaderTime = df.iloc[0]['Time']
+        scores = list()
+        times = list()
+
+        for r in range(self.table.rowCount()):
+            # Get runner's time
+            sec = str2sec(self.table.item(r,5).text())
+            if sec is not None:
+                # Store time only if present
+                times.append(sec)
+                score = self.table.item(r,7).text()
+                if score != '':
+                    scores.append(int(float(score)))
+                else:
+                    scores.append(0)
+
+        if len(times) == 0:
+            self.leaderTime = None
+        else:
+            scores = np.array(scores)
+            times = np.array(times)
+            times = times[scores==np.max(scores)]
+            self.leaderTime = sec2str(np.min(times))
 
     def updateTimeAndLoss(self):
         """ Update `Time` and `Loss` """
 
-        # Update time
-        self.df['Time'] = self.df['Finish'] - self.df['Start']
-        # Update leader time
-        self.updateLeaderTime()
-        # Update loss
-        self.df['Loss'] = self.df['Time'] - self.leaderTime
+        # Step 1: Update all times
+        for r in range(self.table.rowCount()):
+            start = self.table.item(r,3).text()
+            finish = self.table.item(r,4).text()
+            time = diff_times(start,finish)
+            self.table.item(r,5).setText(time)
 
+        # Step 2: Update loss
+        self.updateLeaderTime()
+        if self.leaderTime is not None:
+            for r in range(self.table.rowCount()):
+                time = self.table.item(r,5).text()
+                if time != '':
+                    loss = self.getLoss(time)
+                    # loss = '+'+diff_times(leaderTime,time)
+                    self.table.item(r,6).setText(loss)
+                else:
+                    self.table.item(r,6).setText('')
+
+        self.saveCSV()
+
+    def updateTable(self):
+
+        self.saveCSV()
+        self.loadCSV()
+
+    def sortTable(self):
+
+        self.saveCSV()
+        self.loadCSV()
+
+
+    def addRow(self,r,ID,name,gender,start,finish,time,loss,score,note,reg,fee):
+
+        if time != '' and score == '': score = 0
+        if score != '':
+            score = str(int(float(score)))
+
+        reg = reg if reg != '' else False
+
+        self.table.insertRow(r)
+        self.table.setRowHeight(r,15)
+        self.table.setItem(r, 0,QTableWidgetItem(str(ID)))
+        self.table.setItem(r, 1,QTableWidgetItem(str(name)))
+        self.table.setItem(r, 2,QTableWidgetItem(str(gender)))
+        self.table.setItem(r, 3,QTableWidgetItem(str(start)))
+        self.table.setItem(r, 4,QTableWidgetItem(str(finish)))
+        self.table.setItem(r, 5,QTableWidgetItem(str(time)))
+        self.table.setItem(r, 6,QTableWidgetItem(str(loss)))
+        self.table.setItem(r, 7,QTableWidgetItem(str(score)))
+        self.table.setItem(r, 8,QTableWidgetItem(str(note)))
+        self.table.setItem(r, 9,QTableWidgetItem(str(reg)))
+        self.table.setItem(r,10,QTableWidgetItem(str(fee)))
+
+        clr = None
+        if gender == 'M':
+            clr = QBrush(QColor(230,230,255))
+        elif gender == 'W':
+            clr = QBrush(QColor(255,230,230))
+        if clr is not None:
+            for i in range(9):
+                self.table.item(r,i).setBackground(clr)
+
+        for i in [0,2,7]:
+            self.table.item(r,i).setTextAlignment(Qt.AlignHCenter)
 
     def addRunner(self):
         """ Add entry for new runner """
@@ -438,44 +531,28 @@ class EPOGUI(QMainWindow):
         newGender = 'M' if self.cmbNewGender.currentIndex()==0 else 'W'
         # Get note
         newNote = self.qleNewNote.text()
-
-        # if len(self.df) == 0:
-        #     # Create new df
-        #     pass
-        # else:
         # ID is the lowest ID which is not in the table
         newID = self.getEmptyID()
-        # Create new dataframe line
-        newdf = pd.DataFrame({'Name':newName,'Gender':newGender,'Note':newNote},index=[newID])
-        newdf.index.name = 'ID'
-        # Concat two dataframes
-        self.df = pd.concat([self.df,newdf])
-
+        # Apend row to the end of the table
+        r = self.table.rowCount()
+        self.addRow(r,newID,newName,newGender,'','','','','',newNote,'','')
         # Clear text box so it is ready for new entry
         self.qleNewName.setText('')
         self.dispMsg(f"New runner: {newID}, {newName}, {newGender}",fc=Qt.darkGreen)
-        # Update table
-        self.updateTable()
-        # Save CSV
+        # Save CSV in case of sudden crash
         self.saveCSV()
 
-        # print('Dataframe after adding ==================================')
-        # print(self.df)
+        if self.sortBy == 'Name' or self.sortBy == 'ID':
+            self.sortTable()
 
     def newCSV(self):
         """ Create new CSV file and redefine `self.csvFile` """
-
         filename,_ = QFileDialog.getSaveFileName(self, 'New CSV file','','CSV file (*.csv)')
         print(os.path.splitext(filename)[1])
         if filename != '' and os.path.splitext(filename)[1]=='.csv':
             self.csvFile = filename
             self.dispMsg(f"New CSV file '{filename}' defined!",fc=Qt.darkGreen)
-            # Define empty dataframe
-            newcols = self.cols.copy()
-            newcols.remove('ID')
-            self.df = pd.DataFrame(columns=newcols)
-            self.df.index.name = 'ID'
-            self.updateTable()
+            self.table.setRowCount(0)
         else:
             self.dispMsg(f"File '{filename}' not created!",fc=Qt.red)
             self.dispMsg(f"Filename should not be empty and must end with '.csv' extension!",fc=Qt.red)
@@ -501,200 +578,76 @@ class EPOGUI(QMainWindow):
         # Load file
         df = pd.read_csv(self.csvFile)
 
-        # Check if file contains all required columns
-        if not {'ID','Name','Gender'}.issubset(df.columns):
-            self.dispMsg(f"CSV file must contain at least following columns: ID, Name, Gender",fc=Qt.red)
+        # Check if file contains all columns
+        if not {'ID','Name','Gender','Start','Finish','Time','Loss','Score','Note','Reg.','Fee'}.issubset(df.columns):
+            self.dispMsg(f"CSV file must contain following columns: ID,Name,Gender,Start,Finish,Time,Loss,Score,Note,Reg.,Fee",fc=Qt.red)
             return
-
-        # Set column 'ID' as index
-        df = df.set_index('ID')
-
-        # Add missing columns
-        for col in self.cols:
-            if col != 'ID':
-                if not {col}.issubset(df.columns): df[col] = np.nan
-
-        # Convert string times to seconds
-        df['Start'] = df['Start'].apply(lambda x: str2sec(x))
-        df['Finish'] = df['Finish'].apply(lambda x: str2sec(x))
-
-        self.df = df
-        self.updateTimeAndLoss()
-
-        self.drawTable()
-
-    def saveCSV(self):
-        """ Save data from the table into CSV file """
-
-        csvdf = self.df.copy()
-        csvdf['Start'] = csvdf['Start'].apply(lambda x: sec2str(x))
-        csvdf['Finish'] = csvdf['Finish'].apply(lambda x: sec2str(x))
-        csvdf['Time'] = csvdf['Time'].apply(lambda x: sec2str(x))
-        csvdf['Loss'] = csvdf['Loss'].apply(lambda x: sec2str(x,add_sign=True))
-
-        csvdf.to_csv(self.csvFile)
-
-
-    def setFilter(self,filter_str):
-
-        if filter_str == '':
-            self.drawTable()
-        else:
-            filter_str = '+.*'.join(filter_str[i] for i in range(0,len(filter_str)))
-            filter_str = '.*'+filter_str
-            filter_str = filter_str.lower()
-            print(filter_str)
-            try:        re.compile(filter_str)
-            except:     return
-            df = self.df.copy()
-            df['Name'] = df['Name'].apply(lambda x: x.lower())
-
-            df = self.df[df['Name'].str.match(filter_str)]
-            self.drawTable(df)
-
-    def addRow(self,row,id,name,gender,start,finish,time,loss,score,note,registered,fee):
-
-        r = row
-        id = str(id)
-        start = sec2str(start) if not pd.isna(start) else ''
-        finish = sec2str(finish) if not pd.isna(finish) else ''
-        time = sec2str(time) if not pd.isna(time) else ''
-        score = str(int(float(score))) if not pd.isna(score) else ''
-        note = note if not pd.isna(note) else ''
-        registered = registered if not pd.isna(registered) else False
-        fee = str(fee) if not pd.isna(fee) else ''
-
-        if not pd.isna(loss):
-            sign = '+' if loss>=0 else '-'
-            loss = sign + sec2str(np.abs(loss))
-        else:
-            loss = ''
-
-        self.table.insertRow(r)
-        self.table.setRowHeight(r,15)
-        self.table.setItem(r,self.cols.index('ID'),QTableWidgetItem(id))
-        self.table.setItem(r,self.cols.index('Name'),QTableWidgetItem(name))
-        self.table.setItem(r,self.cols.index('Gender'),QTableWidgetItem(gender))
-        self.table.setItem(r,self.cols.index('Start'),QTableWidgetItem(start))
-        self.table.setItem(r,self.cols.index('Finish'),QTableWidgetItem(finish))
-        self.table.setItem(r,self.cols.index('Time'),QTableWidgetItem(time))
-        self.table.setItem(r,self.cols.index('Loss'),QTableWidgetItem(loss))
-        self.table.setItem(r,self.cols.index('Score'),QTableWidgetItem(score))
-        self.table.setItem(r,self.cols.index('Note'),QTableWidgetItem(note))
-        self.table.setItem(r,self.cols.index('Registered'),QTableWidgetItem(str(registered)))
-        self.table.setItem(r,self.cols.index('Fee'),QTableWidgetItem(fee))
-
-        self.table.item(r,self.cols.index('ID')).setFlags(Qt.ItemIsEnabled)
-
-        bclr = QBrush(QColor(255,255,255))
-        if gender == 'M':
-            bclr = QBrush(QColor(230,230,255))
-        elif gender == 'W':
-            bclr = QBrush(QColor(255,230,230))
-
-        fclr = QBrush(QColor(0,0,0)) if registered else QBrush(QColor(100,100,100))
-        for i in range(self.table.columnCount()):
-            self.table.item(r,i).setBackground(bclr)
-            self.table.item(r,i).setForeground(fclr)
-
-        for i in [0,2,7]:
-            self.table.item(r,i).setTextAlignment(Qt.AlignHCenter)
-
-    def drawTable(self,df=None):
-    
-        if df is None: df = self.df
-
-        start = timer()
-
-        self.drawingTable = True
-
-        # Clear table
-        self.table.setRowCount(0)
 
         # Sort dataframe
         if self.sortBy == 'ID':
-            df = df.sort_index()
+            df = df.sort_values(by='ID')
         elif self.sortBy == 'Name':
             df = df.sort_values(by='Name')
         elif self.sortBy == 'Rank':
             df = df.sort_values(by=['Score','Time'],ascending=[False,True])
 
-        # Read dataframe and store data into table
+        # Read file and store data into table
         for r,(i,row) in enumerate(df.iterrows()):
+            start = row['Start'] if not pd.isnull(row['Start']) else ''
+            finish = row['Finish'] if not pd.isnull(row['Finish']) else ''
+            score = row['Score'] if not pd.isnull(row['Score']) else ''
+            note = row['Note'] if not pd.isnull(row['Note']) else ''
+            reg = row['Reg.'] if not pd.isnull(row['Reg.']) else ''
+            fee = row['Fee'] if not pd.isnull(row['Fee']) else ''
 
-            self.addRow(
-                row = r,
-                id = i,
-                name = row['Name'],
-                gender = row['Gender'],
-                start = row['Start'],
-                finish = row['Finish'],
-                time = row['Time'],
-                loss = row['Loss'],
-                score = row['Score'],
-                note = row['Note'],
-                registered = row['Registered'],
-                fee = row['Fee']
-            )
+            self.addRow(r,row['ID'],row['Name'],row['Gender'],start,finish,'','',score,note,reg,fee)
 
-        end = timer()
+        self.updateTimeAndLoss()
 
-        self.drawingTable = False
+    def saveCSV(self):
+        """ Save data from the table into CSV file """
 
-        # self.dispMsg(f"Table drawn in {end-start}")
+        ID = list()
+        name = list()
+        gender = list()
+        start = list()
+        finish = list()
+        time = list()
+        loss = list()
+        score = list()
+        note = list()
+        reg = list()
+        fee = list()
+        for r in range(self.table.rowCount()):
+            ID.append(self.table.item(r,0).text())
+            name.append(self.table.item(r,1).text())
+            gender.append(self.table.item(r,2).text())
+            start.append(self.table.item(r,3).text())
+            finish.append(self.table.item(r,4).text())
+            time.append(self.table.item(r,5).text())
+            loss.append(self.table.item(r,6).text())
+            score.append(self.table.item(r,7).text())
+            note.append(self.table.item(r,8).text())
+            reg.append(self.table.item(r,9).text())
+            fee.append(self.table.item(r,10).text())
 
-    def updateTable(self):
 
-        self.drawTable()
-
-    def sortTable(self):
-
-        self.drawTable()
+        data = list(zip(ID,name,gender,start,finish,time,loss,score,note,reg,fee))
+        df = pd.DataFrame(data,columns=['ID','Name','Gender','Start','Finish','Time','Loss','Score','Note','Reg.','Fee'])
+        df.to_csv(self.csvFile,index=False)
+        
 
     def tableCellChanged(self,row,col):
         """ Callback when any cell is changed (not just manually) """
         
-        if self.drawingTable: return
-
-        item = self.table.item(row,col)
-        print(row,col,item.text())
-        ID = int(self.table.item(row,self.cols.index('ID')).text())
-
-        if col == self.cols.index('ID'):
-            self.dispMsg("Manual changing of ID may lead to unexpected behaviour!",fc=Qt.red)
-
-        elif col in [self.cols.index('Name'),self.cols.index('Note')]:
-            self.df.loc[ID,self.cols[col]] = item.text()
-
-        elif col == self.cols.index('Gender'):
-            if not (item.text()=="M" or item.text()=="W"):
-                self.dispMsg("Gender should be 'M' or 'W'!",fc=Qt.darkYellow)
-            self.df.loc[ID,self.cols[col]] = item.text()
-
-        elif col in [self.cols.index('Start'),self.cols.index('Finish'),self.cols.index('Time'),self.cols.index('Loss')]:
-            time = str2sec(item.text())
-            if np.isnan(time):
-                self.dispMsg(f"Unexpected format of time (should be 'HH:MM:SS') not '{item.text()}'!",fc=Qt.red)
-            else:
-                self.df.loc[ID,self.cols[col]] = time
-        
-        elif col == self.cols.index('Score'):
-            if not item.text().isnumeric():
-                self.dispMsg(f"Score must be a number! Not '{item.text()}'.",fc=Qt.red)
-            else:
-                self.df.loc[ID,self.cols[col]] = float(item.text())
-        
-        elif col == self.cols.index('Fee'):
-            if not item.text().isnumeric():
-                self.dispMsg(f"Fee must be a number! Not '{item.text()}'.",fc=Qt.red)
-            else:
-                self.df.loc[ID,self.cols[col]] = float(item.text())
-
-        # self.qleFilter.setText('')
-
-        self.updateTimeAndLoss()
-        self.updateTable()
-        self.saveCSV()
+        # item = self.table.item(row,col)
+        # if col == 0:
+        #     self.dispMsg("You should not change ID manually!",fc=Qt.red)
+        # elif col == 3:
+        #     if item.text() != "M" or item.text() != "W":
+        #         self.dispMsg("Gender should be 'M' or 'W'!",fc=Qt.darkYellow)
+        # elif col == 7:
+        #     if self.sortBy == 'Rank': self.sortTable()
         
     def tableContextMenu(self,point:QPoint):
         """ Show context menu after right click on table """
@@ -704,37 +657,20 @@ class EPOGUI(QMainWindow):
         # Get row and column of clicked cell
         row = self.table.currentRow()
         col = self.table.currentColumn()
-        ID = int(float(self.table.item(row,self.cols.index('ID')).text()))
 
         # Compose context menu
         menu = QMenu(self)
 
         # Create actions
-        if self.df.loc[ID,'Registered'] == False or pd.isna(self.df.loc[ID,'Registered']):
-            registerAct = menu.addAction('&Register')
-            uregisterAct = None
-        else:
-            registerAct = None
-            uregisterAct = menu.addAction('Un&register')
         removeAct = menu.addAction('&Delete row')
 
         # Open context menu and get user answer
         action = menu.exec_(self.table.viewport().mapToGlobal(point))
 
         # Perform action according to answer:
-        if action == registerAct:
-            # TODO: Call `self.register(ID)` here, ask for price
-            self.df.loc[ID,'Registered'] = True
+        if action == removeAct:
+            self.table.removeRow(row)
             self.updateTable()
-            self.saveCSV()
-        elif action == uregisterAct:
-            self.df.loc[ID,'Registered'] = False
-            self.updateTable()
-            self.saveCSV()
-        elif action == removeAct:
-            self.df = self.df.drop(ID)
-            self.updateTable()
-            self.saveCSV()
 
     def cmbSortChanged(self,sortBy):
         self.sortBy = sortBy
@@ -747,16 +683,7 @@ class EPOGUI(QMainWindow):
 
     def keyPressEvent(self, a0: QtGui.QKeyEvent) -> None:
         if a0.key() == Qt.Key_Escape:
-            self.qleFilter.setText('')
-            self.table.clearSelection()
             self.qleID.setFocus()
-
-        if a0.key() == Qt.Key_F and a0.modifiers() == Qt.ControlModifier:
-            self.table.clearSelection()
-            self.qleFilter.setFocus()
-
-        if a0.key() == Qt.Key_Down and self.qleFilter.hasFocus():
-            self.table.setFocus()
 
         return super().keyPressEvent(a0)
 
