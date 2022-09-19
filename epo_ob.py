@@ -310,7 +310,7 @@ class EPOGUI(QMainWindow):
 
         self.lblFilter = QLabel('Filter:')
         self.qleFilter = QLineEdit()
-        self.qleFilter.setToolTip("Write part of name")
+        self.qleFilter.setToolTip("Write part of name or ID")
         self.qleFilter.textChanged.connect(self.setFilter)
         self.selectedRow = 0
         
@@ -1017,6 +1017,7 @@ class EPOGUI(QMainWindow):
         self.qleMsgBox.setVisible(self.showOutputAct.isChecked())
 
     def keyPressEvent(self, a0: QtGui.QKeyEvent) -> None:
+
         if a0.key() == Qt.Key_Escape:
             self.qleFilter.setText('')
             self.table.clearSelection()
@@ -1048,6 +1049,11 @@ class EPOGUI(QMainWindow):
                 # In finish -> change score
                 self.setScore(ID)
             self.qleFilter.setText('')
+
+        if a0.key() == Qt.Key_R and a0.modifiers() == Qt.ControlModifier:
+            self.selectedRow = 0
+            self.table.clearSelection()
+            self.qleNewName.setFocus()
 
         return super().keyPressEvent(a0)
 
