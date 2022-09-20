@@ -172,7 +172,8 @@ class RegisterDialog(QDialog):
 
     def changeFee(self,fee_str):
 
-        self.fee = int(fee_str)
+        if isNumber(fee_str):
+            self.fee = int(float(fee_str))
 
 class QuestionDialog(QDialog):
 
@@ -259,13 +260,16 @@ class EPOGUI(QMainWindow):
         self.qleID.setMaximumWidth(50)
         self.qleID.setToolTip(f"Enter runner ID and press enter.\nActivate field by Esc.")
         self.qleID.setValidator(QRegExpValidator(QRegExp("\\d+")))
+        self.qleID.textChanged.connect(self.qleID_changed)
         self.qleID.returnPressed.connect(self.start_stop)
 
-        self.btnOK = QPushButton(' OK',self)
+        self.btnOK = QPushButton(' N/A',self)
         self.btnOK.setObjectName('btn_ok')
-        self.btnOK.setMaximumWidth(70)
+        self.btnOK.setMaximumWidth(100)
+        self.btnOK.setMinimumWidth(100)
         self.btnOK.setIcon(standardIcon('SP_DialogOkButton'))
         self.btnOK.clicked.connect(self.btnClicked)
+        self.btnOK.setEnabled(False)
 
         self.lblTFLS = QLabel("From last start:")
         self.lblTimer = QLabel()
@@ -505,6 +509,8 @@ class EPOGUI(QMainWindow):
             self.updateTable()
 
     def showTime(self):
+        
+        if self.df is None: return
 
         if np.isnan(self.df['Start'].to_numpy()).all():
             self.lblTimer.setText('--:--:--')
@@ -761,6 +767,31 @@ class EPOGUI(QMainWindow):
 
         csvdf.to_csv(self.csvFile)
 
+    def qleID_changed(self,ID:str):
+
+        try:
+            ID = int(ID)
+        except:
+            ID = -1
+
+        if ID not in self.df.index:
+            self.btnOK.setText(" N/A")
+            self.btnOK.setEnabled(False)
+            return
+
+        start = self.df.loc[ID,'Start']
+        finish = self.df.loc[ID,'Finish']
+        if np.isnan(start):
+            # Runner not started yet -> start!
+            self.btnOK.setText(" START!")
+        elif np.isnan(finish):
+            # Not finished yet -> finish!
+            self.btnOK.setText(" FINISH!")
+        else:
+            # Runner is already in finish -> print results
+            self.btnOK.setText(" PRINT!")
+        self.btnOK.setEnabled(True)
+
 
     def setMaxScore(self):
 
@@ -783,6 +814,8 @@ class EPOGUI(QMainWindow):
                 self.selectedRow = 0
                 self.table.selectRow(self.selectedRow)
         else:
+
+            df = self.df
 
             if filter_str.isnumeric():
                 ID = int(filter_str)
