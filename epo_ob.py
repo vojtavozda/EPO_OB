@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 from timeit import default_timer as timer 
-
+import unidecode
 import qtawesome as qta         # run `qta-browser`
 
 from PyQt5 import QtWidgets
@@ -823,14 +823,18 @@ class EPOGUI(QMainWindow):
                     df = self.df.loc[[ID]]
 
             else:
+                
+                filter_str = filter_str.lower()
+                filter_str = unidecode.unidecode(filter_str)
+
                 filter_str = '+.*'.join(filter_str[i] for i in range(0,len(filter_str)))
                 filter_str = '.*'+filter_str
-                filter_str = filter_str.lower()
                 try:        re.compile(filter_str)
                 except:     return
 
                 df = self.df.copy()
                 df['Name'] = df['Name'].apply(lambda x: x.lower())
+                df['Name'] = df['Name'].apply(lambda x: unidecode.unidecode(x))
 
                 df = self.df[df['Name'].str.match(filter_str)]
 
