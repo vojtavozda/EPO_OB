@@ -1,6 +1,5 @@
 
-from cmath import isnan
-from genericpath import isfile
+
 import os
 import re
 import sys
@@ -17,6 +16,8 @@ from PyQt5.QtGui import (QColor, QBrush, QFont, QTextCursor, QRegExpValidator, Q
 from PyQt5.QtCore import (QPoint, Qt, QTimer, QRegExp)
 from PyQt5.QtWidgets import (QAction, QDialogButtonBox, QInputDialog, QDialog, QFileDialog, QStyle, QComboBox, QApplication, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QStyleFactory, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget)
 
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
 
 def str2sec(time_str:str):
     
@@ -114,10 +115,10 @@ class RegisterDialog(QDialog):
 
         self.runner = runner
 
-        lblID = QLabel(f"ID: {ID}")
-        lblName = QLabel(f"Name: {runner['Name']}")
+        lblID = QLabel(f"ID: <b>{ID}</b>")
+        lblName = QLabel(f"Name: <b>{runner['Name']}</b>")
         note = runner['Note'] if not pd.isna(runner['Note']) else ''
-        lblNote = QLabel(f"Note: {note}")
+        lblNote = QLabel(f"Note: <b>{note}</b>")
         lblFee = QLabel("Fee:")
         qleFee = QLineEdit()
         qleFee.setMaximumWidth(50)
@@ -174,6 +175,8 @@ class RegisterDialog(QDialog):
 
         if isNumber(fee_str):
             self.fee = int(float(fee_str))
+        else:
+            self.fee = 0
 
 class QuestionDialog(QDialog):
 
@@ -232,6 +235,54 @@ class StatisticsBox(QDialog):
         self.setWindowTitle("Statistics")
         self.show()
 
+class MplCanvas(FigureCanvasQTAgg):
+
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        self.ax1 = fig.add_subplot(111)
+        self.ax2 = self.ax1.twinx()
+        super(MplCanvas, self).__init__(fig)
+
+class PlotBox(QDialog):
+
+    def __init__(self,df:pd.DataFrame,highlight=None):
+        super().__init__()
+
+        sc = MplCanvas(self, width=5, height=4, dpi=100)
+        # sc.axes.plot([0,1,2,3,4], [10,1,20,3,40])
+
+        df = df.sort_values(by=['Score','Time'],ascending=[False,True])
+
+        start = df['Start'].to_numpy()
+        start = start[~np.isnan(start)].astype(int)
+        finish = df['Finish'].to_numpy()
+        finish = finish[~np.isnan(finish)].astype(int)
+
+        for i in range(len(start)):
+            sc.ax1.plot([start[i],finish[i]],[i,i],color='k')
+        locs = sc.ax1.get_xticks()
+        locs = locs[::2]
+        sc.ax1.set_xticks(locs)
+        sc.ax1.set_xticklabels([sec2str(t) for t in locs])
+        sc.ax1.set_xlabel('Time')
+        sc.ax1.set_ylabel('Rank')
+
+        inForestX = np.sort(np.unique(np.concatenate((start,finish))))
+        inForestN = np.empty(len(inForestX))
+
+        for i in range(len(start)):
+            i1 = np.where(inForestX == start[i])[0][0]
+            i2 = np.where(inForestX == finish[i])[0][0]+1
+            inForestN[i1:i2] += 1
+        sc.ax2.step(inForestX,inForestN,linewidth=2)
+        sc.ax2.set_ylabel('Number of people in forest')
+        # plt.show()
+
+        vbox = QVBoxLayout()
+        vbox.addWidget(sc)
+        self.setLayout(vbox)
+
+        self.show()
 
 class EPOGUI(QMainWindow):
 
@@ -244,7 +295,7 @@ class EPOGUI(QMainWindow):
         # Define columns
         self.cols = ['ID','Name','Gender','Start','Finish','Time','Loss','Score','Note','Registered','Fee']
 
-        self.csvFile = "/home/vovo/Programming/python/EPO_OB/data.csv"
+        self.csvFile = os.path.join(os.path.dirname(os.path.realpath(__file__)),"data.csv")
         self.maxScore = 23
         self.leaderTime = None
 
@@ -258,7 +309,7 @@ class EPOGUI(QMainWindow):
         self.lblSF = QLabel("Start/Finish")
         self.qleID = QLineEdit()
         self.qleID.setMaximumWidth(50)
-        self.qleID.setToolTip(f"Enter runner ID and press enter.\nActivate field by Esc.")
+        self.qleID.setToolTip(f"Enter runner ID and press enter.\nActivate field by `Esc`.")
         self.qleID.setValidator(QRegExpValidator(QRegExp("\\d+")))
         self.qleID.textChanged.connect(self.qleID_changed)
         self.qleID.returnPressed.connect(self.start_stop)
@@ -287,7 +338,7 @@ class EPOGUI(QMainWindow):
         # New runner -----------------------------------------------------------
         self.lblNewRunner = QLabel("New runner")
         self.qleNewName = QLineEdit()
-        self.qleNewName.setToolTip("Runner full name")
+        self.qleNewName.setToolTip("Runner full name.\nActivate field by `Ctrl+R`.")
         self.qleNewName.returnPressed.connect(self.addRunner)
 
         self.cmbNewGender = QComboBox()
@@ -314,7 +365,7 @@ class EPOGUI(QMainWindow):
 
         self.lblFilter = QLabel('Filter:')
         self.qleFilter = QLineEdit()
-        self.qleFilter.setToolTip("Write part of name or ID")
+        self.qleFilter.setToolTip("Write part of name or ID.\nActivate field by `Ctrl+F`.\nSelect runner in table by `UP` or `DOWN` key, then press `Enter`.")
         self.qleFilter.textChanged.connect(self.setFilter)
         self.selectedRow = 0
         
@@ -341,7 +392,6 @@ class EPOGUI(QMainWindow):
         header.setSectionResizeMode(self.cols.index('Registered'),QtWidgets.QHeaderView.ResizeToContents)
         header.setSectionResizeMode(self.cols.index('Fee'),     QtWidgets.QHeaderView.ResizeToContents)
         self.table.setColumnHidden(self.cols.index('Registered'),True)
-        # self.table.setColumnHidden(self.cols.index('Fee'),True)
 
         self.table.cellChanged.connect(self.tableCellChanged)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -468,6 +518,14 @@ class EPOGUI(QMainWindow):
             shortcut = QKeySequence("Ctrl+I")
         )
 
+        self.plotStatisticsAct = QAction(
+            "Plot statistics",
+            self,
+            triggered = self.plotStatistics,
+            icon = qta.icon('msc.graph-line'),
+            shortcut = QKeySequence("Ctrl+P")
+        )
+
         self.showOutputAct = QAction(
             "Show &output",
             self,
@@ -477,9 +535,18 @@ class EPOGUI(QMainWindow):
         )
         self.showOutputAct.setChecked(True)
 
+        self.showAllColumnsAct = QAction(
+            "Show all columns",
+            self,
+            triggered = self.showAllColumns,
+            icon = qta.icon('mdi.table-eye')
+        )
+
         viewMenu = QMenu("&View",self)
         viewMenu.addAction(self.showStatisticsAct)
+        viewMenu.addAction(self.plotStatisticsAct)
         viewMenu.addAction(self.showOutputAct)
+        viewMenu.addAction(self.showAllColumnsAct)
 
         self.aboutAct = ActionDialog(
             parent=self,
@@ -525,6 +592,9 @@ class EPOGUI(QMainWindow):
         dialog = StatisticsBox(self.df)
         dialog.exec()
 
+    def plotStatistics(self):
+        dialog = PlotBox(self.df)
+        dialog.exec()
 
     def start_stop(self):
 
@@ -750,15 +820,7 @@ class EPOGUI(QMainWindow):
     def saveCSV(self):
         """ Save data from the table into CSV file """
 
-        # Sort dataframe
-        if self.sortBy == 'ID':
-            csvdf = self.df.sort_index()
-        elif self.sortBy == 'Name':
-            csvdf = self.df.sort_values(by='Name')
-        elif self.sortBy == 'Rank':
-            csvdf = self.df.sort_values(by=['Score','Time'],ascending=[False,True])
-        else:
-            csvdf = self.df
+        csvdf = self.getSortedDF(self.df)
 
         csvdf['Start'] = csvdf['Start'].apply(lambda x: sec2str(x))
         csvdf['Finish'] = csvdf['Finish'].apply(lambda x: sec2str(x))
@@ -767,16 +829,34 @@ class EPOGUI(QMainWindow):
 
         csvdf.to_csv(self.csvFile)
 
+    def getSortedDF(self,df):
+
+        # Sort dataframe
+        if self.sortBy == 'ID':
+            df = df.sort_index()
+        elif self.sortBy == 'Name':
+            df = df.sort_values(by='Name')
+        elif self.sortBy == 'Rank':
+            df = df.sort_values(by=['Score','Time'],ascending=[False,True])
+        else:
+            df = self.df
+
+        return df
+
     def qleID_changed(self,ID:str):
 
         try:
             ID = int(ID)
         except:
-            ID = -1
+            ID = ''
 
         if ID not in self.df.index:
             self.btnOK.setText(" N/A")
             self.btnOK.setEnabled(False)
+            if ID == '':
+                self.drawTable()
+            else:
+                self.table.setRowCount(0)
             return
 
         start = self.df.loc[ID,'Start']
@@ -791,6 +871,9 @@ class EPOGUI(QMainWindow):
             # Runner is already in finish -> print results
             self.btnOK.setText(" PRINT!")
         self.btnOK.setEnabled(True)
+
+        df = self.df.loc[[ID]]
+        self.drawTable(df)
 
 
     def setMaxScore(self):
@@ -902,13 +985,7 @@ class EPOGUI(QMainWindow):
         # Clear table
         self.table.setRowCount(0)
 
-        # Sort dataframe
-        if self.sortBy == 'ID':
-            df = df.sort_index()
-        elif self.sortBy == 'Name':
-            df = df.sort_values(by='Name')
-        elif self.sortBy == 'Rank':
-            df = df.sort_values(by=['Score','Time'],ascending=[False,True])
+        df = self.getSortedDF(df)
 
         # Read dataframe and store data into table
         for r,(i,row) in enumerate(df.iterrows()):
@@ -1002,6 +1079,7 @@ class EPOGUI(QMainWindow):
         # Get row and column of clicked cell
         row = self.table.currentRow()
         col = self.table.currentColumn()
+        if row<0 or col<0: return
         ID = int(float(self.table.item(row,self.cols.index('ID')).text()))
 
         # Compose context menu
@@ -1015,6 +1093,8 @@ class EPOGUI(QMainWindow):
             registerAct = None
             uregisterAct = menu.addAction('Un&register')
         removeAct = menu.addAction('&Delete row')
+        hideColAct = menu.addAction('&Hide column')
+        showAllColsAct = menu.addAction('Show &all columns')
 
         # Open context menu and get user answer
         action = menu.exec_(self.table.viewport().mapToGlobal(point))
@@ -1043,6 +1123,16 @@ class EPOGUI(QMainWindow):
             else:
                 self.dispMsg("Removing cancelled!",fc=Qt.darkYellow)
 
+        elif action == hideColAct:
+            self.table.setColumnHidden(col,True)
+
+        elif action == showAllColsAct:
+            self.showAllColumns()
+
+    def showAllColumns(self):
+        for i in range(self.table.columnCount()):
+            if i != self.cols.index('Registered'):
+                self.table.setColumnHidden(i,False)
 
     def cmbSortChanged(self,sortBy):
         self.sortBy = sortBy
@@ -1056,8 +1146,17 @@ class EPOGUI(QMainWindow):
     def keyPressEvent(self, a0: QtGui.QKeyEvent) -> None:
 
         if a0.key() == Qt.Key_Escape:
+            ID = np.nan
+            if self.qleFilter.hasFocus():
+                row = self.table.selectedItems()[0].row()
+                ID = int(self.table.item(row,self.cols.index('ID')).text())
             self.qleFilter.setText('')
+            self.qleID.setText('')
             self.table.clearSelection()
+            if not np.isnan(ID):
+                df = self.getSortedDF(self.df)
+                row = df.index.get_loc(ID)
+                self.table.selectRow(row)
             self.qleID.setFocus()
 
         if a0.key() == Qt.Key_F and a0.modifiers() == Qt.ControlModifier:
