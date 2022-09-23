@@ -1,4 +1,14 @@
+"""
+EPO_OB
+======
+Application based on PyQt5 for logging times and scores of EPO runners.
 
+**Idea:** Input is csv file which contains at least one column with names. This
+csv files is loaded into pd.DataFrame which is shown as a table. Any manual
+change in the table changes entry in the dataframe and table is then completely
+redrawn (yes, redraw one line or one cell is faster but requires more coding).
+Dataframe is automatically saved as csv file after every change.
+"""
 
 import os
 import re
@@ -209,7 +219,7 @@ class StatisticsBox(QDialog):
         lblStarted = QLabel(f"Started: {started}/{len(df)}")
         finished = np.count_nonzero(~pd.isna(df['Finish'].to_numpy()))
         lblFinished = QLabel(f"Finished: {finished}/{len(df)}")
-        lblInForest = QLabel(f"In forest: {started-finished}")
+        lblInForest = QLabel(f"In forest: <b>{started-finished}</b>")
 
         df = df.sort_values(by=['Score','Time'],ascending=[False,True])
         leaderTime = sec2str(df.iloc[0]['Time']) if not pd.isna(df.iloc[0]['Time']) else '--:--:--'
@@ -249,14 +259,14 @@ class PlotBox(QDialog):
         super().__init__()
 
         sc = MplCanvas(self, width=5, height=4, dpi=100)
-        # sc.axes.plot([0,1,2,3,4], [10,1,20,3,40])
 
         df = df.sort_values(by=['Score','Time'],ascending=[False,True])
 
-        start = df['Start'].to_numpy()
-        start = start[~np.isnan(start)].astype(int)
-        finish = df['Finish'].to_numpy()
-        finish = finish[~np.isnan(finish)].astype(int)
+        start_wnan = df['Start'].to_numpy()
+        finish_wnan = df['Finish'].to_numpy()
+        # Remove entries of runners who have not finished yet
+        start = start_wnan[np.logical_and(~np.isnan(start_wnan),~np.isnan(finish_wnan))].astype(int)
+        finish = finish_wnan[np.logical_and(~np.isnan(start_wnan),~np.isnan(finish_wnan))].astype(int)
 
         for i in range(len(start)):
             sc.ax1.plot([start[i],finish[i]],[i,i],color='k')
@@ -514,7 +524,7 @@ class EPOGUI(QMainWindow):
             "Show &statistics",
             self,
             triggered = self.showStatistics,
-            icon = qta.icon('msc.graph-line'),
+            icon = qta.icon('ei.align-justify'),
             shortcut = QKeySequence("Ctrl+I")
         )
 
@@ -555,7 +565,7 @@ class EPOGUI(QMainWindow):
             actionIcon=qta.icon('fa5s.info'),
             dialogIcon=QMessageBox.Information,
             dialogTitle="About",
-            dialogContent='by vovo'
+            dialogContent="GitHub: <a href=\"https://github.com/vojtavozda/EPO_OB\">github.com/vojtavozda/EPO_OB</a><br><br>by vovo"
         )
 
         helpMenu = QMenu("&Help",self)
@@ -792,8 +802,8 @@ class EPOGUI(QMainWindow):
         df = pd.read_csv(self.csvFile)
 
         # Check if file contains all required columns
-        if not {'Name','Gender'}.issubset(df.columns):
-            self.dispMsg(f"CSV file must contain at least following columns: Name, Gender",fc=Qt.red)
+        if not {'Name'}.issubset(df.columns):
+            self.dispMsg(f"CSV file must contain at least following columns: Name",fc=Qt.red)
             return
 
         if not {'ID'}.issubset(df.columns):
@@ -937,6 +947,8 @@ class EPOGUI(QMainWindow):
         note = note if not pd.isna(note) else ''
         registered = registered if not pd.isna(registered) else False
         fee = str(int(float(fee))) if not pd.isna(fee) and isNumber(fee) else ''
+
+        if pd.isna(gender): gender = ''
 
         if not pd.isna(loss):
             sign = '+' if loss>=0 else '-'
@@ -1092,6 +1104,7 @@ class EPOGUI(QMainWindow):
         else:
             registerAct = None
             uregisterAct = menu.addAction('Un&register')
+        setScoreAct = menu.addAction('Set &score')
         removeAct = menu.addAction('&Delete row')
         hideColAct = menu.addAction('&Hide column')
         showAllColsAct = menu.addAction('Show &all columns')
@@ -1110,6 +1123,9 @@ class EPOGUI(QMainWindow):
             self.df.loc[ID,'Registered'] = False
             self.updateTable()
             self.saveCSV()
+
+        elif action == setScoreAct:
+            self.setScore(ID)
 
         elif action == removeAct:
             dialog = QuestionDialog(f"Are you sure you want to remove runner '{self.df.loc[ID,'Name']}'?","Remove runner?")
@@ -1148,8 +1164,11 @@ class EPOGUI(QMainWindow):
         if a0.key() == Qt.Key_Escape:
             ID = np.nan
             if self.qleFilter.hasFocus():
-                row = self.table.selectedItems()[0].row()
-                ID = int(self.table.item(row,self.cols.index('ID')).text())
+                try:
+                    row = self.table.selectedItems()[0].row()
+                    ID = int(self.table.item(row,self.cols.index('ID')).text())
+                except:
+                    pass
             self.qleFilter.setText('')
             self.qleID.setText('')
             self.table.clearSelection()
