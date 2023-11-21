@@ -1,6 +1,6 @@
 ID,Name,Gender,Start,Finish,Time,Loss,Score,Note,Registered,Fee
 1,Adam,M,09:14:12,09:15:02,00:00:50,+00:00:00,23.0,,True,90.0
-2,Eva,W,09:14:33,09:17:55,00:03:22,+00:02:32,23.0,,True,90.0
+2,Eva,W,09:14:33,09:17:55,00:03:22,+00:02:32,21.0,,True,90.0
 3,Petr,M,09:14:23,,,,,EPO,True,70.0
 4,Ája,W,09:14:43,,,,,EPO,True,70.0
 5,Nepřišel,M,,,,,,,False,

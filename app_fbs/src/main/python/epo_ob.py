@@ -19,6 +19,7 @@ from datetime import datetime
 from timeit import default_timer as timer 
 import unidecode
 import qtawesome as qta         # run `qta-browser`
+import ftplib
 
 from PyQt5 import QtWidgets
 from PyQt5 import QtGui
@@ -843,6 +844,42 @@ class EPOGUI(QMainWindow):
         csvdf['Loss'] = csvdf['Loss'].apply(lambda x: sec2str(x,add_sign=True))
 
         csvdf.to_csv(self.csvFile)
+
+        self.saveHTML()
+
+    def saveHTML(self):
+
+        htmlfile = f"{os.path.splitext(self.csvFile)[0]}.html"
+
+        old_sort_by = self.sortBy
+
+        self.sortBy = 'Rank'
+
+        htmldf = self.getSortedDF(self.df)
+
+        htmldf['Start'] = htmldf['Start'].apply(lambda x: sec2str(x))
+        htmldf['Finish'] = htmldf['Finish'].apply(lambda x: sec2str(x))
+        htmldf['Time'] = htmldf['Time'].apply(lambda x: sec2str(x))
+        htmldf['Loss'] = htmldf['Loss'].apply(lambda x: sec2str(x,add_sign=True))
+        htmldf.insert(0, 'Rank', range(1, 1 + len(htmldf)))
+
+        htmldf.to_html(
+            htmlfile,
+            columns=('Rank','Name','Gender','Start','Finish','Time','Loss','Score','Note'),
+            index=False,
+            )
+
+        try:
+            session = ftplib.FTP('ftp.rps.cz','vojta@vozda.cz','Pv.b36.p')
+            file = open(htmlfile,'rb')                  # file to send
+            session.storbinary('STOR epo.html', file)     # send the file
+            file.close()                                    # close file and FTP
+            session.quit()
+        except:
+            pass
+
+        self.sortBy = old_sort_by
+
 
     def getSortedDF(self,df):
 
