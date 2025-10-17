@@ -8,6 +8,11 @@ csv files is loaded into pd.DataFrame which is shown as a table. Any manual
 change in the table changes entry in the dataframe and table is then completely
 redrawn (yes, redraw one line or one cell is faster but requires more coding).
 Dataframe is automatically saved as csv file after every change.
+
+by vovo
+
+https://github.com/vojtavozda/EPO_OB
+
 """
 
 import os
@@ -868,17 +873,29 @@ class EPOGUI(QMainWindow):
             htmlfile,
             columns=('Rank','Name','Gender','Start','Finish','Time','Loss','Score','Note'),
             index=False,
-            )
+        )
+
+        # also save a CSV version of the same table (same columns)
+        csvfile = os.path.splitext(htmlfile)[0] + '.csv'
+        htmldf.to_csv(
+            csvfile,
+            columns=('Rank','Name','Gender','Start','Finish','Time','Loss','Score','Note'),
+            index=False,
+            encoding='utf-8'
+        )
 
         try:
             session = ftplib.FTP(
-                ftp_credentials.HOST,
-                ftp_credentials.USER,
-                ftp_credentials.PSWD
+            ftp_credentials.HOST,
+            ftp_credentials.USER,
+            ftp_credentials.PSWD
             )
-            file = open(htmlfile,'rb')                  # file to send
-            session.storbinary('STOR epo.html', file)     # send the file
-            file.close()                                    # close file and FTP
+            # upload HTML
+            with open(htmlfile,'rb') as file:
+                session.storbinary('STOR epo.html', file)
+            # upload CSV
+            with open(csvfile,'rb') as file:
+                session.storbinary('STOR epo.csv', file)
             session.quit()
         except:
             pass
