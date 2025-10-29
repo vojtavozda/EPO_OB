@@ -898,6 +898,7 @@ class EPOGUI(QMainWindow):
                 session.storbinary('STOR epo.csv', file)
             session.quit()
         except:
+            print("FTP upload failed!")
             pass
 
         self.sortBy = old_sort_by
