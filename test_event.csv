@@ -1,6 +1,6 @@
-ID,Name,Gender,Start,Finish,Time,Loss,Score,Note,Registered,Fee
-1,Adam,M,09:14:12,09:15:02,00:00:50,+00:00:00,23.0,,True,90.0
-2,Eva,W,09:14:33,16:58:50,07:44:17,+07:43:27,23.0,,True,90.0
-4,Ája,W,09:14:43,,,,23.0,EPO,True,70.0
-3,Petr,M,09:14:23,,,,23.0,EPO,True,70.0
-5,Nepřišel,M,,,,,,,False,
+Rank,Name,Gender,Start,Finish,Time,Loss,Score,Note
+1,Petr,M,09:14:23,17:08:00,07:53:37,+00:00:00,23.0,EPO
+2,Adam,M,09:14:12,17:07:56,07:53:44,+00:00:07,23.0,
+3,Eva,W,09:14:33,,,,23.0,
+4,Ája,W,09:14:43,,,,23.0,EPO
+5,Nepřišel,M,,,,,23.0,

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EPO Results</title>
+
+  <!-- Bootstrap -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+
+  <!-- PapaParse -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    body {
+      background: #f7f7f7;
+      padding: 0.5rem;
+      font-size: 0.9rem;
+    }
+    .table-container {
+      max-width: 800px;
+      margin: auto;
+    }
+
+    table {
+      background: white;
+      border-radius: 0rem;
+      overflow: hidden;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #fff !important;
+      z-index: 1;
+      font-weight: 600;
+    }
+    td, th {
+      padding: 0.25rem 0.4rem !important; /* compact layout */
+      text-align: center;
+      vertical-align: middle;
+      border-color: #ddd !important;
+    }
+
+    /* --- Color Rules (force override Bootstrap transparency) --- */
+    tr.inactive-row,
+    tr.inactive-row td {
+      background-color: #e0e0e0 !important;
+      color: #9a9a9a !important;
+    }
+    tr.pending-male,
+    tr.pending-male td {
+      background-color: #e7f1ff !important;
+      color: #9a9a9a !important;
+    }
+    tr.pending-female,
+    tr.pending-female td {
+      background-color: #ffe7f4 !important;
+      color: #9a9a9a !important;
+    }
+    tr.male-row,
+    tr.male-row td {
+      background-color: #e7f1ff !important;
+      color: #000 !important;
+    }
+    tr.female-row,
+    tr.female-row td {
+      background-color: #ffe7f4 !important;
+      color: #000 !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="table-container">
+    <h5 class="text-center mb-2">EPO Ďábličák</h5>
+    <div class="table-responsive">
+      <table class="table table-bordered mb-0" id="results-table">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    fetch("epo.csv")
+      .then((r) => r.text())
+      .then((csvText) => {
+        const data = Papa.parse(csvText.trim(), { header: true }).data;
+        const table = document.getElementById("results-table");
+        const thead = table.querySelector("thead");
+        const tbody = table.querySelector("tbody");
+
+        const cols = ["Rank", "Name", "Time", "Loss", "Start", "Finish", "Score", "Note"];
+
+        // Build header
+        thead.innerHTML = `<tr>${cols.map((c) => `<th>${c}</th>`).join("")}</tr>`;
+
+        // Build rows
+        data.forEach((row) => {
+          const gender = (row["Gender"] || "").trim().toUpperCase();
+          const start = row["Start"]?.trim();
+          const time = row["Time"]?.trim();
+          let rank = row["Rank"]?.trim();
+
+          let rowClass = "";
+          if (!start) {
+            rank = "-";
+            rowClass = "inactive-row";
+          } else if (start && !time) {
+            rowClass = gender === "M" ? "pending-male" : "pending-female";
+            rank = "-";
+          } else {
+            rowClass = gender === "M" ? "male-row" : "female-row";
+          }
+          
+        const cells = cols
+          .map((c) => {
+            // Override the Rank column
+            if (c === "Rank") return `<td>${rank || ""}</td>`;
+            return `<td>${row[c] || ""}</td>`;
+          })
+          .join("");
+
+          tbody.insertAdjacentHTML("beforeend", `<tr class="${rowClass}">${cells}</tr>`);
+        });
+      })
+      .catch((err) => {
+        console.error(err);
+        document.body.innerHTML = `<p class="text-danger text-center">Failed to load CSV.</p>`;
+      });
+  </script>
+</body>
+</html>
